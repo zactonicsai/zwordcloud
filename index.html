@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Cloud Builder</title>
+    <script src="/tailwinds.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        .word-item {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .word-item:hover {
+            transform: scale(1.1);
+            filter: brightness(1.2);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .word-animate {
+            animation: fadeIn 0.5s ease forwards;
+        }
+        .tab-active-dark {
+            background: linear-gradient(to right, #9333ea, #ec4899);
+            color: white;
+        }
+        .tab-inactive-dark {
+            background: rgba(255, 255, 255, 0.1);
+            color: #9ca3af;
+        }
+        .tab-active-light {
+            background: linear-gradient(to right, #7c3aed, #db2777);
+            color: white;
+        }
+        .tab-inactive-light {
+            background: rgba(0, 0, 0, 0.05);
+            color: #6b7280;
+        }
+        /* Theme transition */
+        * {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen transition-colors duration-300 dark:bg-gradient-to-br dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 bg-gradient-to-br from-gray-100 via-purple-50 to-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Theme Toggle -->
+        <div class="fixed top-4 right-4 z-50">
+            <button id="themeToggle" class="flex items-center gap-2 dark:bg-white/10 bg-black/10 dark:hover:bg-white/20 hover:bg-black/20 dark:text-white text-gray-700 px-4 py-2 rounded-full font-medium transition-all backdrop-blur-lg border dark:border-white/20 border-black/10">
+                <span id="themeIcon">🌙</span>
+                <span id="themeText">Dark</span>
+            </button>
+        </div>
+
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold mb-2">
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500">
+                    Word Cloud Builder
+                </span>
+            </h1>
+            <p class="dark:text-gray-400 text-gray-600 text-lg">Create beautiful word clouds from your data</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="max-w-3xl mx-auto mb-8">
+            <div class="dark:bg-white/10 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl dark:border-white/20 border-gray-200 border overflow-hidden">
+                <!-- Tabs -->
+                <div class="flex border-b dark:border-white/10 border-gray-200">
+                    <button id="tabManual" class="flex-1 py-4 px-6 font-semibold transition-all tab-btn tab-active rounded-tl-2xl">
+                        ✏️ Manual Entry
+                    </button>
+                    <button id="tabUpload" class="flex-1 py-4 px-6 font-semibold transition-all tab-btn tab-inactive rounded-tr-2xl">
+                        📁 Upload JSON
+                    </button>
+                </div>
+
+                <!-- Manual Entry Panel -->
+                <div id="panelManual" class="p-6">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h3 class="dark:text-white text-gray-800 font-semibold">Enter Words & Values</h3>
+                        <button id="addRowBtn" class="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Row
+                        </button>
+                    </div>
+                    
+                    <!-- Table Form -->
+                    <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                        <table class="w-full">
+                            <thead class="sticky top-0 dark:bg-slate-800/90 bg-gray-100/90 backdrop-blur">
+                                <tr class="dark:text-gray-400 text-gray-600 text-sm">
+                                    <th class="text-left pb-2 pl-2">Word</th>
+                                    <th class="text-left pb-2">Value</th>
+                                    <th class="w-12 pb-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="wordTableBody" class="space-y-2">
+                                <!-- Rows will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="mt-6 flex gap-3">
+                        <button id="generateBtn" class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-purple-500/25">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Generate Word Cloud
+                        </button>
+                        <button id="clearFormBtn" class="flex items-center gap-2 dark:bg-white/10 bg-gray-200 dark:hover:bg-white/20 hover:bg-gray-300 dark:text-white text-gray-700 px-4 py-3 rounded-xl font-semibold transition-all dark:border-white/20 border-gray-300 border">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Upload JSON Panel -->
+                <div id="panelUpload" class="p-6 hidden">
+                    <div class="flex flex-col items-center gap-4">
+                        <label class="relative cursor-pointer w-full">
+                            <input type="file" id="fileInput" accept=".json" class="hidden">
+                            <div class="flex flex-col items-center justify-center gap-3 border-2 border-dashed dark:border-white/30 border-gray-300 rounded-xl p-8 hover:border-purple-500 dark:hover:bg-white/5 hover:bg-purple-50 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <span class="dark:text-white text-gray-700 font-semibold">Click to upload JSON file</span>
+                                <span class="dark:text-gray-400 text-gray-500 text-sm">or drag and drop</span>
+                            </div>
+                        </label>
+                        
+                        <!-- File info -->
+                        <div id="fileInfo" class="text-center dark:text-gray-400 text-gray-600 text-sm hidden">
+                            <span class="text-green-500">✓</span> <span id="fileName"></span> - <span id="wordCount"></span> words loaded
+                        </div>
+
+                        <!-- JSON Format Help -->
+                        <details class="w-full dark:bg-black/20 bg-gray-100 rounded-xl overflow-hidden">
+                            <summary class="p-3 cursor-pointer dark:text-gray-300 text-gray-600 text-sm dark:hover:bg-white/5 hover:bg-gray-200 transition-colors">
+                                📋 JSON Format Guide
+                            </summary>
+                            <div class="p-3 pt-0 dark:text-gray-400 text-gray-500 text-xs">
+                                <pre class="dark:bg-black/30 bg-gray-200 rounded-lg p-3 overflow-x-auto"><code>[
+  { "word": "JavaScript", "value": 100 },
+  { "word": "Python", "value": 85 },
+  { "word": "React", "value": 70 }
+]</code></pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="max-w-3xl mx-auto mb-8 flex justify-center gap-3">
+            <button id="resetBtn" class="flex items-center gap-2 dark:bg-white/10 bg-white dark:hover:bg-white/20 hover:bg-gray-100 dark:text-white text-gray-700 px-5 py-2.5 rounded-xl font-medium transition-all dark:border-white/20 border-gray-300 border shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Load Sample Data
+            </button>
+            <button id="randomizeBtn" class="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+                Shuffle Colors
+            </button>
+        </div>
+
+        <!-- Word Cloud Container -->
+        <div class="max-w-5xl mx-auto">
+            <div id="wordCloud" class="dark:bg-white/5 bg-white/80 backdrop-blur-lg rounded-3xl p-6 min-h-[400px] flex flex-wrap items-center justify-center gap-1 content-center dark:border-white/10 border-gray-200 border shadow-2xl leading-none">
+                <!-- Words will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-8 dark:text-gray-500 text-gray-500 text-sm">
+            <p>Click on any word to see its value • Hover to highlight</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        // Default sample data
+        const defaultData = [
+            { word: "JavaScript", value: 100 },
+            { word: "Python", value: 95 },
+            { word: "React", value: 85 },
+            { word: "Node.js", value: 80 },
+            { word: "TypeScript", value: 78 },
+            { word: "CSS", value: 75 },
+            { word: "HTML", value: 72 },
+            { word: "Vue.js", value: 65 },
+            { word: "Angular", value: 60 },
+            { word: "Tailwind", value: 58 },
+            { word: "MongoDB", value: 55 },
+            { word: "PostgreSQL", value: 52 },
+            { word: "Docker", value: 50 },
+            { word: "AWS", value: 48 },
+            { word: "Git", value: 45 },
+            { word: "REST API", value: 42 },
+            { word: "GraphQL", value: 40 },
+            { word: "Redux", value: 38 },
+            { word: "Webpack", value: 35 },
+            { word: "Jest", value: 32 },
+            { word: "Sass", value: 30 },
+            { word: "Firebase", value: 28 },
+            { word: "Next.js", value: 55 },
+            { word: "Svelte", value: 35 },
+            { word: "Rust", value: 40 },
+            { word: "Go", value: 45 },
+            { word: "Kubernetes", value: 38 },
+            { word: "Redis", value: 33 },
+            { word: "Linux", value: 50 },
+            { word: "Agile", value: 25 }
+        ];
+
+        // Color palettes for dark mode
+        const darkColorPalettes = [
+            ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'],
+            ['#E74C3C', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#34495E', '#16A085', '#C0392B'],
+            ['#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF6B6B', '#48DBFB', '#1DD1A1', '#FECA57', '#FF9F43', '#EE5A24'],
+            ['#6C5CE7', '#A29BFE', '#FD79A8', '#FDCB6E', '#00B894', '#E17055', '#74B9FF', '#55EFC4', '#FAB1A0', '#81ECEC']
+        ];
+
+        // Color palettes for light mode (darker/more saturated)
+        const lightColorPalettes = [
+            ['#DC2626', '#0891B2', '#0284C7', '#059669', '#D97706', '#9333EA', '#0D9488', '#CA8A04', '#7C3AED', '#2563EB'],
+            ['#B91C1C', '#1D4ED8', '#15803D', '#B45309', '#6D28D9', '#0F766E', '#C2410C', '#1E3A5F', '#047857', '#991B1B'],
+            ['#DB2777', '#2563EB', '#4C1D95', '#0E7490', '#DC2626', '#0284C7', '#059669', '#D97706', '#EA580C', '#B91C1C'],
+            ['#5B21B6', '#7C3AED', '#BE185D', '#CA8A04', '#047857', '#C2410C', '#1D4ED8', '#059669', '#9D174D', '#0891B2']
+        ];
+
+        let currentPalette = 0;
+        let currentData = [...defaultData];
+        let rowCounter = 0;
+        let isDarkMode = true;
+
+        // DOM Elements
+        const wordCloudContainer = document.getElementById('wordCloud');
+        const fileInput = document.getElementById('fileInput');
+        const resetBtn = document.getElementById('resetBtn');
+        const randomizeBtn = document.getElementById('randomizeBtn');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const wordCount = document.getElementById('wordCount');
+        const tabManual = document.getElementById('tabManual');
+        const tabUpload = document.getElementById('tabUpload');
+        const panelManual = document.getElementById('panelManual');
+        const panelUpload = document.getElementById('panelUpload');
+        const wordTableBody = document.getElementById('wordTableBody');
+        const addRowBtn = document.getElementById('addRowBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const clearFormBtn = document.getElementById('clearFormBtn');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const themeText = document.getElementById('themeText');
+
+        // Theme toggle
+        function updateTheme() {
+            if (isDarkMode) {
+                document.documentElement.classList.add('dark');
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Light';
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Dark';
+            }
+            updateTabStyles();
+            renderWordCloud(currentData);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            isDarkMode = !isDarkMode;
+            updateTheme();
+            showToast(`Switched to ${isDarkMode ? 'dark' : 'light'} mode`);
+        });
+
+        // Update tab styles based on theme
+        function updateTabStyles() {
+            const tabs = document.querySelectorAll('.tab-btn');
+            tabs.forEach(tab => {
+                tab.classList.remove('tab-active-dark', 'tab-inactive-dark', 'tab-active-light', 'tab-inactive-light', 'tab-active', 'tab-inactive');
+            });
+            
+            if (tabManual.classList.contains('active') || !panelManual.classList.contains('hidden')) {
+                if (isDarkMode) {
+                    tabManual.classList.add('tab-active-dark');
+                    tabUpload.classList.add('tab-inactive-dark');
+                } else {
+                    tabManual.classList.add('tab-active-light');
+                    tabUpload.classList.add('tab-inactive-light');
+                }
+            } else {
+                if (isDarkMode) {
+                    tabUpload.classList.add('tab-active-dark');
+                    tabManual.classList.add('tab-inactive-dark');
+                } else {
+                    tabUpload.classList.add('tab-active-light');
+                    tabManual.classList.add('tab-inactive-light');
+                }
+            }
+        }
+
+        // Tab switching
+        tabManual.addEventListener('click', () => {
+            panelManual.classList.remove('hidden');
+            panelUpload.classList.add('hidden');
+            updateTabStyles();
+        });
+
+        tabUpload.addEventListener('click', () => {
+            panelUpload.classList.remove('hidden');
+            panelManual.classList.add('hidden');
+            updateTabStyles();
+        });
+
+        // Create a table row
+        function createTableRow(word = '', value = '') {
+            const rowId = `row-${rowCounter++}`;
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = 'group';
+            tr.innerHTML = `
+                <td class="pr-2 pb-2">
+                    <input type="text" placeholder="Enter word" value="${word}" 
+                        class="word-input w-full dark:bg-white/10 bg-gray-100 dark:border-white/20 border-gray-300 border rounded-lg px-3 py-2 dark:text-white text-gray-800 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all">
+                </td>
+                <td class="pr-2 pb-2">
+                    <input type="number" placeholder="Value" value="${value}" min="1"
+                        class="value-input w-full dark:bg-white/10 bg-gray-100 dark:border-white/20 border-gray-300 border rounded-lg px-3 py-2 dark:text-white text-gray-800 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all">
+                </td>
+                <td class="pb-2">
+                    <button class="delete-row-btn opacity-50 group-hover:opacity-100 text-red-400 hover:text-red-300 hover:bg-red-500/20 p-2 rounded-lg transition-all" title="Delete row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+            
+            // Add delete handler
+            tr.querySelector('.delete-row-btn').addEventListener('click', () => {
+                tr.remove();
+            });
+
+            return tr;
+        }
+
+        // Initialize form with empty rows
+        function initializeForm(count = 5) {
+            wordTableBody.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                wordTableBody.appendChild(createTableRow());
+            }
+        }
+
+        // Populate form with data
+        function populateForm(data) {
+            wordTableBody.innerHTML = '';
+            data.forEach(item => {
+                wordTableBody.appendChild(createTableRow(item.word, item.value));
+            });
+            // Add a few empty rows
+            for (let i = 0; i < 3; i++) {
+                wordTableBody.appendChild(createTableRow());
+            }
+        }
+
+        // Get data from form
+        function getFormData() {
+            const rows = wordTableBody.querySelectorAll('tr');
+            const data = [];
+            rows.forEach(row => {
+                const word = row.querySelector('.word-input').value.trim();
+                const value = parseInt(row.querySelector('.value-input').value, 10);
+                if (word && !isNaN(value) && value > 0) {
+                    data.push({ word, value });
+                }
+            });
+            return data;
+        }
+
+        // Add row button
+        addRowBtn.addEventListener('click', () => {
+            wordTableBody.appendChild(createTableRow());
+        });
+
+        // Generate from form
+        generateBtn.addEventListener('click', () => {
+            const data = getFormData();
+            if (data.length === 0) {
+                showToast('Please enter at least one word with a value', true);
+                return;
+            }
+            currentData = data;
+            renderWordCloud(currentData);
+            showToast(`Generated word cloud with ${data.length} words!`);
+        });
+
+        // Clear form
+        clearFormBtn.addEventListener('click', () => {
+            initializeForm(5);
+            showToast('Form cleared');
+        });
+
+        // Calculate font size based on value relative to max
+        function calculateFontSize(value, maxValue) {
+            const minSize = 12;
+            const maxSize = 64;
+            const ratio = value / maxValue;
+            return Math.round(minSize + (maxSize - minSize) * ratio);
+        }
+
+        // Get random color from current palette
+        function getRandomColor() {
+            const palettes = isDarkMode ? darkColorPalettes : lightColorPalettes;
+            const palette = palettes[currentPalette];
+            return palette[Math.floor(Math.random() * palette.length)];
+        }
+
+        // Shuffle array
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Render word cloud
+        function renderWordCloud(data) {
+            wordCloudContainer.innerHTML = '';
+            
+            if (!data || data.length === 0) {
+                wordCloudContainer.innerHTML = `<p class="${isDarkMode ? 'text-gray-400' : 'text-gray-500'} text-lg">Enter words above and click "Generate" to create your word cloud</p>`;
+                return;
+            }
+
+            const maxValue = Math.max(...data.map(item => item.value));
+            const shuffledData = shuffleArray(data);
+
+            shuffledData.forEach((item, index) => {
+                const fontSize = calculateFontSize(item.value, maxValue);
+                const color = getRandomColor();
+                
+                const wordElement = document.createElement('span');
+                wordElement.className = 'word-item word-animate inline-block px-1 font-bold';
+                wordElement.style.fontSize = `${fontSize}px`;
+                wordElement.style.color = color;
+                wordElement.style.animationDelay = `${index * 20}ms`;
+                wordElement.style.opacity = '0';
+                wordElement.style.margin = '2px 4px';
+                wordElement.textContent = item.word;
+                wordElement.title = `${item.word}: ${item.value}`;
+                
+                // Click handler to show value
+                wordElement.addEventListener('click', () => {
+                    showToast(`"${item.word}" has a value of ${item.value}`);
+                });
+
+                wordCloudContainer.appendChild(wordElement);
+            });
+        }
+
+        // Show toast notification
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toast.className = `fixed bottom-4 right-4 ${isError ? 'bg-red-600' : 'bg-green-600'} text-white px-6 py-3 rounded-xl shadow-lg transform transition-all duration-300 z-50`;
+            toastMessage.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Handle file upload
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.name.endsWith('.json')) {
+                showToast('Please upload a JSON file', true);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    
+                    // Validate data structure
+                    if (!Array.isArray(data)) {
+                        throw new Error('JSON must be an array');
+                    }
+                    
+                    const validData = data.filter(item => 
+                        item.word && typeof item.word === 'string' &&
+                        item.value && typeof item.value === 'number'
+                    );
+
+                    if (validData.length === 0) {
+                        throw new Error('No valid word/value pairs found');
+                    }
+
+                    currentData = validData;
+                    renderWordCloud(currentData);
+                    
+                    // Show file info
+                    fileInfo.classList.remove('hidden');
+                    fileName.textContent = file.name;
+                    wordCount.textContent = validData.length;
+                    
+                    // Also populate the form
+                    populateForm(validData);
+                    
+                    showToast(`Loaded ${validData.length} words successfully!`);
+                } catch (error) {
+                    showToast(`Error: ${error.message}`, true);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Reset to default
+        resetBtn.addEventListener('click', () => {
+            currentData = [...defaultData];
+            renderWordCloud(currentData);
+            populateForm(currentData);
+            fileInfo.classList.add('hidden');
+            fileInput.value = '';
+            showToast('Loaded sample data');
+        });
+
+        // Randomize colors
+        randomizeBtn.addEventListener('click', () => {
+            currentPalette = (currentPalette + 1) % darkColorPalettes.length;
+            renderWordCloud(currentData);
+            showToast('Colors shuffled!');
+        });
+
+        // Initialize
+        document.documentElement.classList.add('dark');
+        updateTabStyles();
+        initializeForm(5);
+        renderWordCloud(currentData);
+    </script>
+</body>
+</html>
